@@ -49,3 +49,9 @@ impl SerializableData for DataList {
         buffer.push_str("]");
     }
 }
+
+impl Clone for DataList {
+    fn clone(&self) -> Self {
+        Self { vec: self.vec.clone() }
+    }
+}

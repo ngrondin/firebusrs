@@ -4,7 +4,7 @@ mod stringreader;
 
 use super::datalist;
 use super::datamap;
-use super::DataError;
+use super::errors::DataError;
 use super::DataValue;
 use super::Date;
 use super::Number;
@@ -18,7 +18,6 @@ use serialreader::SerialReader;
 use stringreader::StringReader;
 use macros::*;
 
-#[allow(dead_code)]
 pub fn parse(s: &str) -> Result<DataValue, DataError> {
     let mut reader = SerialReader::new(s);
     let value: DataValue = parse_from_reader(&mut reader)?;
@@ -29,6 +28,12 @@ pub fn parse_map(s: &str) -> Result<DataMap, DataError> {
     let mut reader = SerialReader::new(s);
     let map: DataMap = parse_map_from_reader(&mut reader)?;
     return Ok(map);
+}
+
+pub fn parse_list(s: &str) -> Result<DataList, DataError> {
+    let mut reader = SerialReader::new(s);
+    let list: DataList = parse_list_from_reader(&mut reader)?;
+    return Ok(list);
 }
 
 fn parse_from_reader(reader: &mut SerialReader) -> Result<DataValue, DataError> {

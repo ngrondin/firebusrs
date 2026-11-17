@@ -10,7 +10,6 @@ pub struct DataMap {
     map: std::collections::HashMap<String, DataValue>
 }
 
-#[allow(dead_code)]
 impl DataMap {
     pub fn new() -> Self {
         Self { map: HashMap::new() }
@@ -102,5 +101,11 @@ impl SerializableData for DataMap {
         }
         buffer.push_str(&indent_str);
         buffer.push_str("}");
+    }
+}
+
+impl Clone for DataMap {
+    fn clone(&self) -> Self {
+        Self { map: self.map.clone() }
     }
 }

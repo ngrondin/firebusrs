@@ -1,4 +1,5 @@
-use std::fmt;
+use std::fmt::{self, Display, Formatter};
+
 use chrono::prelude::*;
 use datalist::DataList;
 use datamap::DataMap;
@@ -6,16 +7,8 @@ use datamap::DataMap;
 pub mod parsers;
 pub mod datamap;
 pub mod datalist;
+pub mod errors;
 
-pub struct DataError {
-    pub message: String
-}
-
-impl fmt::Debug for DataError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.message)
-    }
-}
 
 trait SerializableData {
     fn get_serialized_string(&self) -> String {
@@ -35,14 +28,26 @@ pub enum Number {
     NaN
 }
 
-impl fmt::Display for Number {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl Display for Number {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             Number::Int(i) => write!(f, "{}", i),
             Number::Float(fl) => write!(f, "{}", fl),
             Number::PositiveInfinity => write!(f, "Infinity"),
             Number::NegativeInfinity => write!(f, "-Infinity"),
             Number::NaN => write!(f, "NaN")
+        }
+    }
+}
+
+impl Clone for Number {
+    fn clone(&self) -> Self {
+        match self {
+            Self::Int(arg0) => Self::Int(arg0.clone()),
+            Self::Float(arg0) => Self::Float(arg0.clone()),
+            Self::PositiveInfinity => Self::PositiveInfinity,
+            Self::NegativeInfinity => Self::NegativeInfinity,
+            Self::NaN => Self::NaN,
         }
     }
 }
@@ -57,6 +62,15 @@ impl fmt::Display for Date {
         match self {
             Date::DateTimeUtc(dt) => write!(f, "{}", dt.to_rfc3339_opts(SecondsFormat::Millis, true)),
             Date::DateTimeOffset(dt) => write!(f, "{}", dt.to_rfc3339_opts(SecondsFormat::Millis, true)),
+        }
+    }
+}
+
+impl Clone for Date {
+    fn clone(&self) -> Self {
+        match self {
+            Self::DateTimeUtc(dt) => Self::DateTimeUtc(dt.clone()),
+            Self::DateTimeOffset(dt) => Self::DateTimeOffset(dt.clone()),
         }
     }
 }
@@ -103,4 +117,18 @@ impl SerializableData for DataValue {
      }
 }
 
+impl Clone for DataValue {
+    fn clone(&self) -> Self {
+        match self {
+            Self::String(str) => Self::String(str.clone()),
+            Self::Number(num) => Self::Number(num.clone()),
+            Self::Bool(bl) => Self::Bool(bl.clone()),
+            Self::Date(dt) => Self::Date(dt.clone()),
+            Self::DataMap(map) => Self::DataMap(map.clone()),
+            Self::DataList(list) => Self::DataList(list.clone()),
+            Self::Null => Self::Null,
+            Self::None => Self::None,
+        }
+    }
+}
 
