@@ -1,77 +1,40 @@
-#![allow(dead_code)]
+use firebus::core::errors::FunctionError;
+use firebus::core::payload::Payload;
+use firebus::core::{Firebus, ServiceProvider};
 
-mod data;
-mod core;
+use std::sync::Arc;
+use std::{thread, time};
 
-use core::{message::{Message, MessageType}, payload::Payload, rcu::{RCUMap, RCUValue}, serviceman::Service, Firebus};
-use std::{sync::Arc, thread, time::{self}};
+struct EchoService {}
 
-use chrono::Utc;
-use data::parsers;
+impl ServiceProvider for EchoService {
+    fn service(&self, payload: &Payload) -> Result<Payload, FunctionError> {
+        Ok(Payload::from_string(&format!("echo:{}", payload.get_string())))
+    }
 
-// use chrono::Utc;
-// use data::parsers;
-
-struct Service1 { }
-
-impl Service for Service1 {
-    fn call(&self) {
-        println!("Executing service");
-        thread::sleep(time::Duration::from_millis(50));
+    fn get_service_information(&self) -> Option<firebus::core::FunctionInfoSpec> {
+        None
     }
 }
 
 fn main() {
-    /*let data_str = "{ \"dt\":\"2024-08-25T12:15:28.999+10:00\", num: 8.288 }";
-    match parsers::parse_map(data_str) {
-        Ok(mut map) => {
-            map.put_date_utc("date", Utc::now());
-            println!("Map is: {}", map);
-            let mut payload = Payload::from_datamap(map);
-            payload.set_meta("token", "bebop");
-            let msg = Message::new(1, 2, MessageType::QueryNode, "test", Arc::new(payload));
-            let bytes = msg.serialize();
-            println!("Bytes are: {:#04X?}", bytes);
-
-            let new_msg = Message::deserialize(&bytes).unwrap();
-            println!("Payload data is {}", new_msg.payload.get_datamap().unwrap())
-
-        },
-        Err(e) => print!("Error: {}", e.message),
-    } */
-    
     let firebus = Firebus::new();
-    thread::sleep(time::Duration::from_millis(20));
-    firebus.register_service("service01", Arc::new(Service1{}));
-    //firebus.dirman.add_function("service01", firebus.node_id);
-    for _ in 0..10 {
-        let payload = Payload::from_string("Request String");
-        firebus.request("service01", Arc::new(payload));
-        thread::sleep(time::Duration::from_millis(20));
-    }
-    
+    let node_id = firebus.get_node_id();
+    println!("Node id: {}", node_id);
 
-    /*let val: Arc<RCUValue<String>> = Arc::new(RCUValue::new("allo".to_owned()));
-    for _ in 0..4 {
-        let valref = val.clone();
-        thread::spawn(move || {
-            loop {
-                println!("Value is {}", valref.read());
-                thread::sleep(time::Duration::from_millis(100));
-            }
-        });    
-    }
+    firebus.register_service_provider("service01", Arc::new(EchoService {}), 5);
+    thread::sleep(time::Duration::from_millis(50));
 
-    let valref = val.clone();
-    thread::spawn(move || {
-        for i in 0..5 {
-            valref.set(|val| {
-                *val = format!("value{}", i);
-            });
-            thread::sleep(time::Duration::from_millis(1000));
+    for i in 0..3 {
+        let payload = Payload::from_string(&format!("Request String {}", i));
+        match firebus.request_service("service01", &payload) {
+            Ok(response) => println!("Response {}: {}", i, response.get_string()),
+            Err(e) => eprintln!("Error: {}", e)
         }
-    });*/
+        thread::sleep(time::Duration::from_millis(100));
+    }
 
-    thread::sleep(time::Duration::from_millis(5000));
+    println!("{}", firebus);
+    firebus.close();
     println!("Main thread completing");
 }

@@ -247,7 +247,7 @@ fn parse_literal_from_reader(reader: &mut SerialReader) -> Result<DataValue, Dat
             return Ok(DataValue::Bool(true));
         } else if value.eq("false") {
             return Ok(DataValue::Bool(false));
-        } else if value.eq("mull") {
+        } else if value.eq("null") {
             return Ok(DataValue::Null);
         } else {
             let num_res = parse_number(&value);
@@ -290,7 +290,8 @@ pub fn parse_number(s: &str) -> Result<Number, DataError> {
             div *= 10.0;
             c = reader.next();
         }
-        return Ok(Number::Float((int as f64) + dec))
+        let val = (int as f64) + dec;
+        return Ok(if neg { Number::Float(-val) } else { Number::Float(val) })
     }
 }
 
@@ -404,10 +405,51 @@ pub fn parse_date(s: &str) -> Result<Date, DataError> {
     }
 
     if offset == 0 {
-        let dt = Utc.with_ymd_and_hms(year as i32, month as u32, day as u32, hour as u32, min as u32, sec as u32).unwrap().with_nanosecond(nano as u32).unwrap();
+        let dt = Utc.with_ymd_and_hms(year as i32, month as u32, day as u32, hour as u32, min as u32, sec as u32)
+            .single()
+            .ok_or(DataError { message: String::from("Invalid date") })?;
+        let dt = dt.with_nanosecond(nano.min(999_999_999) as u32)
+            .ok_or(DataError { message: String::from("Invalid date") })?;
         return Ok(Date::DateTimeUtc(dt))
     } else {
-        let dt = FixedOffset::east_opt(offset as i32).unwrap().with_ymd_and_hms(year as i32, month as u32, day as u32, hour as u32, min as u32, sec as u32).unwrap().with_nanosecond(nano as u32).unwrap();
+        let off = FixedOffset::east_opt(offset as i32).ok_or(DataError { message: String::from("Invalid date offset") })?;
+        let dt = off.with_ymd_and_hms(year as i32, month as u32, day as u32, hour as u32, min as u32, sec as u32)
+            .single()
+            .ok_or(DataError { message: String::from("Invalid date") })?;
+        let dt = dt.with_nanosecond(nano.min(999_999_999) as u32)
+            .ok_or(DataError { message: String::from("Invalid date") })?;
         return Ok(Date::DateTimeOffset(dt))
     }
-} 
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_null_literal() {
+        let m = parse_map("{ a:null }").unwrap();
+        assert!(matches!(m.get("a"), DataValue::Null));
+    }
+
+    #[test]
+    fn parse_numbers() {
+        assert!(matches!(parse_number("42").unwrap(), Number::Int(42)));
+        assert!(matches!(parse_number("-42").unwrap(), Number::Int(-42)));
+        assert!(matches!(parse_number("1.5").unwrap(), Number::Float(1.5)));
+        assert!(matches!(parse_number("-1.5").unwrap(), Number::Float(-1.5)));
+        assert!(matches!(parse_number("0.5").unwrap(), Number::Float(0.5)));
+    }
+
+    #[test]
+    fn parse_date_valid() {
+        assert!(matches!(parse_date("2024-08-25T12:15:28.999+10:00").unwrap(), Date::DateTimeOffset(_)));
+        assert!(matches!(parse_date("2024-08-25T12:15:28Z").unwrap(), Date::DateTimeUtc(_)));
+    }
+
+    #[test]
+    fn parse_date_invalid_does_not_panic() {
+        assert!(parse_date("2024-02-30T10:00:00Z").is_err());
+        assert!(parse_date("2024-13-01T10:00:00Z").is_err());
+    }
+}

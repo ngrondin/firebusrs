@@ -9,7 +9,7 @@ use super::payload::Payload;
 
 static NEXT_MSG_ID: AtomicU32 = AtomicU32::new(0);
 
-#[derive(Clone)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MessageType {
     QueryNode,
     NodeInformation,
@@ -94,6 +94,10 @@ impl MessageGenerator {
         self.next_id.fetch_add(1, Ordering::SeqCst)
     }
 
+    pub fn next_message_id(&self) -> u32 {
+        self.next()
+    }
+
     pub fn new_message(&self, dest: u32, mt: MessageType, sub: &str, pl: Arc<Payload>) -> Message {
         Message {
             version: 5,
@@ -137,7 +141,7 @@ impl MessageGenerator {
             flags: msg.flags,
             repeat_count: msg.repeat_count + 1,
             repeats_left: msg.repeats_left - 1,
-            message_type: msg.message_type.clone(),
+            message_type: msg.message_type,
             correlation: msg.correlation,
             correlation_seq: msg.correlation_seq,
             subject: msg.subject.clone(),
@@ -148,8 +152,9 @@ impl MessageGenerator {
 
 }
 
+#[derive(Clone)]
 pub struct Message {
-    version: u16,
+    pub version: u16,
     pub message_id: u32,
     pub originator: u32,
     pub destination: u32,
@@ -186,10 +191,10 @@ impl Message {
         bb.into_vec()
     }
 
-    pub fn try_deserialize(data: &Vec<u8>) -> Result<Self, Box<dyn Error>> {
-        let mut bb = ByteReader::from_bytes(&data);
+    pub fn try_deserialize(data: &[u8]) -> Result<Self, Box<dyn Error>> {
+        let mut bb = ByteReader::from_bytes(data);
         let version = bb.read_u16()?;
-        if version != 5 { return Err( Box::new( DataError { message: format!("Wrong message version") } ) ) }
+        if version != 5 { return Err( Box::new( DataError { message: String::from("Wrong message version") } ) ) }
         let message_id = bb.read_u32()?;
         let destination = bb.read_u32()?;
         let originator = bb.read_u32()?;
@@ -209,7 +214,7 @@ impl Message {
         Ok( Message {version, message_id, destination, originator, flags, repeat_count, repeats_left, message_type, correlation, correlation_seq, subject, payload: Arc::new(payload) } )
     }
 
-    pub fn deserialize(data: &Vec<u8>) -> Result<Self, DataError> {
+    pub fn deserialize(data: &[u8]) -> Result<Self, DataError> {
         match Message::try_deserialize(data) {
             Ok(o) => Ok(o),
             Err(err) => Err( DataError { message: format!("Error deserializing message: {}", err ) })

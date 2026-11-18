@@ -18,7 +18,19 @@ impl DataList {
 
     pub fn push_string(&mut self, val: &str) {
         self.vec.push(DataValue::String(val.to_string()));
-    } 
+    }
+
+    pub fn len(&self) -> usize {
+        self.vec.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.vec.is_empty()
+    }
+
+    pub fn get(&self, i: usize) -> &DataValue {
+        &self.vec[i]
+    }
 }
 
 impl fmt::Display for DataList {

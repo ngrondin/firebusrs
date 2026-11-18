@@ -29,11 +29,29 @@ impl SerialReader {
     }
 
     pub fn back(&mut self) {
-        self.i -= 1;
-        self.col -= 1;
+        if self.i > 0 {
+            self.i -= 1;
+            self.col -= 1;
+        }
     }
 
     pub fn has_more(&self) -> bool {
         self.i < self.len
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn back_at_start_does_not_panic() {
+        let mut reader = SerialReader::new("abc");
+        reader.back();
+        assert_eq!(reader.i, 0);
+        reader.next();
+        reader.back();
+        reader.back();
+        assert_eq!(reader.i, 0);
     }
 }

@@ -22,7 +22,7 @@ impl DataMap {
             let key = arr[i];
             let val = arr[i + 1];
             s.put_string(key, val);
-            i += 1;
+            i += 2;
         }
         s
     }
@@ -107,5 +107,19 @@ impl SerializableData for DataMap {
 impl Clone for DataMap {
     fn clone(&self) -> Self {
         Self { map: self.map.clone() }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn new_with_pairs() {
+        let m = DataMap::new_with(&["k1", "v1", "k2", "v2"]);
+        assert_eq!(m.get_string("k1"), "v1");
+        assert_eq!(m.get_string("k2"), "v2");
+        assert!(matches!(m.get("v1"), DataValue::None));
+        assert!(matches!(m.get("1"), DataValue::None));
     }
 }
