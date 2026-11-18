@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use super::connection::Connection;
 use super::dirman::FunctionInfoSpec;
 use super::errors::FunctionError;
 use super::message::Message;
@@ -7,6 +8,13 @@ use super::payload::Payload;
 use super::streamep::StreamEndpoint;
 
 // SPI contracts mirroring io.firebus.interfaces.
+
+pub trait ConnectionListener: Send + Sync {
+    fn connection_created(&self, c: &Arc<Connection>);
+    fn connection_failed(&self, c: &Arc<Connection>);
+    fn message_received(&self, m: Arc<Message>, c: &Arc<Connection>);
+    fn connection_closed(&self, c: &Arc<Connection>);
+}
 
 pub trait ServiceProvider: Send + Sync {
     fn service(&self, payload: &Payload) -> Result<Payload, FunctionError>;

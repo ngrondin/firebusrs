@@ -3,11 +3,16 @@
 
 mod address;
 mod consumerman;
+mod connection;
 mod connectionman;
+mod connectionserver;
 mod correlation;
+pub mod crypto;
 mod dirman;
+mod discovery;
 pub mod errors;
 mod execman;
+pub mod framing;
 mod functionentry;
 mod functionfinder;
 mod historyqueue;
@@ -23,6 +28,7 @@ mod threadman;
 
 pub use address::Address;
 pub use consumerman::ConsumerManager;
+pub use connection::Connection;
 pub use connectionman::ConnectionManager;
 pub use correlation::CorrelationManager;
 pub use dirman::{Directory, FunctionInfo, FunctionInfoSpec, NodeInfo};
@@ -33,7 +39,8 @@ pub use functionentry::FunctionEntry;
 pub use functionfinder::FunctionFinder;
 pub use historyqueue::HistoryQueue;
 pub use interfaces::{
-    Consumer, CorrelationListener, ServiceProvider, ServiceRequestor, StreamHandler, StreamProvider
+    Consumer, ConnectionListener, CorrelationListener, ServiceProvider, ServiceRequestor, StreamHandler,
+    StreamProvider
 };
 pub use nodecore::{NodeContext, NodeCore, NodeSelfRef};
 pub use request::{ServiceRequest, ServiceRequestAsync};

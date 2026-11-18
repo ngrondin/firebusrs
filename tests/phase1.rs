@@ -269,7 +269,7 @@ fn local_directory_contains_registered_functions() {
         + &node.streamman.get_function_state_string(id)
         + &node.consumerman.get_function_state_string(id)
         + &dir.get_directory_state_string(id);
-    let _ = &node;
+    assert!(snapshot.contains(&format!("{},f,s,svc\r\n", id)));
     firebus.close();
 }
 
@@ -279,7 +279,7 @@ fn correlation_entry_expires_and_is_swept() {
     let node = firebus.get_node();
     // QueryNode addressed to a node that never answers.
     let query = node.message_generator.new_message(
-        424242, // unknown node: routed out, dropped by the phase-1 stub transport
+        424242, // unknown node: no directory entry, so nothing can answer
         MessageType::QueryNode,
         "",
         Arc::new(Payload::empty())

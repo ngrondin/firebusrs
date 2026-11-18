@@ -6,7 +6,9 @@ use crate::data::datamap::DataMap;
 use super::connectionman::ConnectionManager;
 use super::consumerman::ConsumerManager;
 use super::correlation::{CorrHandles, CorrelationManager};
+use super::crypto::derive_key;
 use super::dirman::Directory;
+use super::discovery::DiscoveryAgent;
 use super::historyqueue::HistoryQueue;
 use super::message::{Message, MessageGenerator, MessageType};
 use super::payload::Payload;
@@ -83,6 +85,7 @@ pub struct NodeCore {
     pub streamman: Arc<StreamManager>,
     pub consumerman: Arc<ConsumerManager>,
     pub connman: Mutex<Option<Arc<ConnectionManager>>>,
+    pub discovery: Arc<DiscoveryAgent>,
     pub message_threads: Arc<ThreadManager>,
     pub service_threads: Arc<ThreadManager>,
     pub stream_threads: Arc<ThreadManager>,
@@ -95,15 +98,16 @@ pub struct NodeCore {
 
 impl NodeCore {
     pub fn new(port: u32, network: &str, password: &str) -> Arc<Self> {
-        let _ = (port, password);
         Self::initialise(port, network, password)
     }
 
-    fn initialise(port: u32, network: &str, _password: &str) -> Arc<Self> {
+    fn initialise(port: u32, network: &str, password: &str) -> Arc<Self> {
         let node_id: u32 = {
             let mut r = rand::thread_rng();
             r.gen::<u32>() & 0x7fffffff
         };
+        // Mirrors NodeCore.initialise: PBKDF2-HMAC-SHA256(password, salt, 65536, 256).
+        let key = derive_key(password);
 
         // Java: ThreadManager(nodeCore, min, max, priority, name, defaultTimeout, warningTime)
         let message_threads = ThreadManager::new("Mesg", 10, 20, 10000, 1000);
@@ -139,10 +143,10 @@ impl NodeCore {
         let streamman = StreamManager::new(ctx.clone());
         let consumerman = ConsumerManager::new(ctx.clone());
 
-        // Phase 1: no sockets yet; the stub keeps the address book + status
-        // surface so the facade and diagnostics work. Phase 2 replaces it with
-        // the real TCP/ciphered ConnectionManager.
-        let connman = Arc::new(ConnectionManager::new(node_id, network, port));
+        // Phase 2: real TCP/ciphered connection manager plus the default
+        // multicast discovery agent (both bind real sockets).
+        let connman = ConnectionManager::new(node_id, network, key, port, self_ref.clone());
+        let discovery = DiscoveryAgent::new(self_ref.clone(), node_id, network, connman.get_port());
         let message_generator = ctx.message_generator.clone();
 
         let nc = Arc::new(Self {
@@ -153,7 +157,8 @@ impl NodeCore {
             serviceman,
             streamman,
             consumerman,
-            connman: Mutex::new(Some(connman)),
+            connman: Mutex::new(Some(std::sync::Arc::clone(&connman))),
+            discovery: std::sync::Arc::clone(&discovery),
             message_threads,
             service_threads,
             stream_threads,
@@ -164,6 +169,9 @@ impl NodeCore {
             quit: std::sync::atomic::AtomicBool::new(false)
         });
         self_ref.init(nc.clone());
+        // Only now may the manager threads run: they dereference NodeSelfRef.
+        connman.start();
+        discovery.start();
         nc
     }
 
@@ -204,7 +212,7 @@ impl NodeCore {
         }
         if dest != self.node_id || dest == 0 {
             if let Some(cm) = self.get_connection_manager() {
-                cm.send_message(msg);
+                cm.send_message(&msg);
             }
         }
     }
@@ -298,6 +306,7 @@ impl NodeCore {
         if let Some(cm) = self.get_connection_manager() {
             cm.close();
         }
+        self.discovery.close();
         self.corrman.close();
         self.message_threads.close();
         self.service_threads.close();
