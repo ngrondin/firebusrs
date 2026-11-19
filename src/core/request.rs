@@ -235,7 +235,7 @@ impl ServiceRequestAsync {
 }
 
 impl CorrelationListener for ServiceRequestAsync {
-    fn correlated_response_received(&self, _out: Arc<Message>, in_msg: Arc<Message>) {
+    fn correlated_response_received(&self, _out: Option<Arc<Message>>, in_msg: Arc<Message>) {
         match in_msg.message_type {
             MessageType::ServiceError => {
                 let error_message = in_msg.payload.get_string();
@@ -257,7 +257,7 @@ impl CorrelationListener for ServiceRequestAsync {
         self.node_core.corrman.remove_entry(in_msg.correlation as i32);
     }
 
-    fn correlation_timedout(&self, _out: Arc<Message>) {
+    fn correlation_timedout(&self, _out: Option<Arc<Message>>) {
         if let Some(fi) = self.current_fi.lock().unwrap().as_ref() {
             fi.timed_out_while_executing();
         }

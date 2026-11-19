@@ -223,14 +223,9 @@ fn expiry_jobs(st: &mut EntryState) -> Vec<ListenerJob> {
 
 fn run_jobs(jobs: Vec<ListenerJob>) {
     for job in jobs {
-        let out = match job.out {
-            Some(out) => out,
-            // Java would NPE here; the first outbound is always set before a
-            // listener can exist, so this is only a safety valve.
-            None => continue
-        };
         if job.timeout {
             let listener = job.listener.clone();
+            let out = job.out.clone();
             let fn_name = job.fn_name.as_deref();
             job.pool.enqueue(
                 Box::new(move || {
@@ -241,6 +236,7 @@ fn run_jobs(jobs: Vec<ListenerJob>) {
             );
         } else if let Some(in_msg) = job.in_msg {
             let listener = job.listener.clone();
+            let out = job.out.clone();
             let fn_name = job.fn_name.as_deref();
             job.pool.enqueue(
                 Box::new(move || {

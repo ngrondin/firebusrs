@@ -98,12 +98,16 @@ impl StreamEndpoint {
     }
 
     pub fn set_handler(&self, handler: Arc<dyn StreamHandler>) {
-        *self.handler.lock().unwrap() = Some(handler);
-        let pending: Vec<Arc<Message>> = self.pre_handler_in.lock().unwrap().drain(..).collect();
-        if let Some(handler) = self.handler.lock().unwrap().as_ref() {
-            for msg in pending {
-                self._process_inbound(handler, msg);
-            }
+        // Java's synchronized setHandler + non-reentrant flush: replay buffered
+        // messages without holding the handler lock (a replayed StreamEnd
+        // re-locks it via _disconnect).
+        let pending: Vec<Arc<Message>>;
+        {
+            *self.handler.lock().unwrap() = Some(handler.clone());
+            pending = self.pre_handler_in.lock().unwrap().drain(..).collect();
+        }
+        for msg in pending {
+            self._process_inbound(&handler, msg);
         }
     }
 
@@ -192,15 +196,18 @@ impl StreamEndpoint {
 }
 
 impl CorrelationListener for StreamEndpoint {
-    fn correlated_response_received(&self, _out: Arc<Message>, in_msg: Arc<Message>) {
-        if let Some(handler) = self.handler.lock().unwrap().as_ref() {
-            self._process_inbound(handler, in_msg);
-        } else {
-            self.pre_handler_in.lock().unwrap().push(in_msg);
+    fn correlated_response_received(&self, _out: Option<Arc<Message>>, in_msg: Arc<Message>) {
+        // Clone the handler out of the lock: processing may re-enter _disconnect,
+        // which takes the handler lock again (Java's synchronized methods are
+        // reentrant; std::sync::Mutex is not).
+        let handler = self.handler.lock().unwrap().clone();
+        match handler {
+            Some(handler) => self._process_inbound(&handler, in_msg),
+            None => self.pre_handler_in.lock().unwrap().push(in_msg)
         }
     }
 
-    fn correlation_timedout(&self, _out: Arc<Message>) {
+    fn correlation_timedout(&self, _out: Option<Arc<Message>>) {
         self.close();
     }
 }

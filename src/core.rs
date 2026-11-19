@@ -24,6 +24,7 @@ mod request;
 mod serviceman;
 mod streamep;
 mod streamman;
+mod streamrequest;
 mod threadman;
 
 pub use address::Address;
@@ -47,6 +48,7 @@ pub use request::{ServiceRequest, ServiceRequestAsync};
 pub use serviceman::ServiceManager;
 pub use streamep::StreamEndpoint;
 pub use streamman::StreamManager;
+pub use streamrequest::StreamRequest;
 pub use threadman::ThreadManager;
 
 use std::sync::atomic::{AtomicI32, Ordering};
@@ -190,8 +192,29 @@ impl Firebus {
         request.execute()
     }
 
-    // Phase 1: streams carry no endpoint plumbing yet beyond the endpoint type;
-    // request_stream lands in Phase 3.
+    // Mirrors Firebus.requestStream(name, payload, timeout).
+    pub fn request_stream(&self, stream_name: &str, payload: &Payload) -> Result<Arc<StreamEndpoint>, RequestError> {
+        self.request_stream_with_timeout(stream_name, payload, None, self.default_timeout())
+    }
+
+    // Mirrors Firebus.requestStream(name, payload, requestorFunctionName, timeout).
+    pub fn request_stream_with_timeout(
+        &self,
+        stream_name: &str,
+        payload: &Payload,
+        requestor_function_name: Option<&str>,
+        timeout_ms: i32
+    ) -> Result<Arc<StreamEndpoint>, RequestError> {
+        let request = StreamRequest::new(
+            self.node.clone(),
+            stream_name,
+            Arc::new(payload.clone()),
+            requestor_function_name.map(String::from),
+            timeout_ms
+        );
+        request.initiate()
+    }
+
     pub fn publish(&self, data_name: &str, payload: &Payload) {
         let msg = self.node.message_generator.new_message(
             0,

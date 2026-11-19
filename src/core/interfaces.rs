@@ -43,7 +43,10 @@ pub trait ServiceRequestor: Send + Sync {
     fn timeout(&self);
 }
 
+// The outbound message is None for entries that were created directly
+// (createEntry + setListenerOnEntry, e.g. server-side stream endpoints) and
+// never had a first outbound sent through the manager (Java passes null).
 pub trait CorrelationListener: Send + Sync {
-    fn correlated_response_received(&self, out: Arc<Message>, in_msg: Arc<Message>);
-    fn correlation_timedout(&self, out: Arc<Message>);
+    fn correlated_response_received(&self, out: Option<Arc<Message>>, in_msg: Arc<Message>);
+    fn correlation_timedout(&self, out: Option<Arc<Message>>);
 }
